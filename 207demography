@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+
+import sys
+import math
+
+xTab = []
+yTab = []
+
+def flag_h():
+    print("USAGE:")
+    print("    ./207demography code [...]\n")
+    print("DESCRIPTION")
+    print("    code    country code")
+
+def parse_file():
+    file = open("207demography_data.csv")
+    dataTab = []
+    lines = file.readlines()
+    file.close()
+    for line in lines:
+        dataTab.append(line.split(';'))
+    return dataTab
+
+def calc_moy(yTab):
+    result = 0.0
+    for j in range(len(yTab)):
+        result += int(yTab[j])
+    result = result / 58
+    return (result)
+
+def get_var(yTab):
+    m = calc_moy(yTab)
+    res = 0.0
+    for j in range(len(yTab)):
+        res += (float(yTab[j]) - m) ** 2
+    return float(res / 58)
+
+def calc_num_cov(xTab, yTab):
+    res = 0.0
+    for j in range(len(xTab)):
+        res += int(xTab[j]) * int(yTab[j])
+    return res
+
+def get_cov(xTab, yTab):
+    num = calc_num_cov(xTab, yTab)
+    last_part = calc_moy(xTab) * calc_moy(yTab)
+    n = 58
+    return float((num / n) - last_part)
+
+def get_idx(tab, country):
+    for i in range(len(tab)):
+        if tab[i][1] == country:
+            return i
+    exit(84)
+
+def get_coef(xTab, yTab):
+    return (float(get_cov(xTab, yTab) / get_var(xTab)))
+
+def get_B(xTab, yTab, a):
+    return (calc_moy(yTab) - a * calc_moy(xTab))
+
+def coef_fit2(xTab, yTab):
+    return (float(get_cov(xTab, yTab) / get_var(yTab)))
+
+def get_rmsd(xTab, yTab, a, b):
+    res = 0.0
+    y = 0.0
+    for i in range(len(xTab)):
+        y = a * int(xTab[i]) + b
+        res += (y - int(yTab[i])) ** 2 / 58
+    return math.sqrt(res)
+
+def get_rmsd_fit2(xTab, yTab, a, b):
+    res = 0.0
+    y = 0.0
+    for i in range(len(xTab)):
+        y = (int(xTab[i]) - b) / a
+        res += (y - int(yTab[i])) ** 2 / 58
+    return math.sqrt(res)
+
+def B_fit2(xTab, yTab, a):
+    return (calc_moy(xTab) - a * calc_moy(yTab))
+
+def display_fit1(xTab, yTab, tab, i, rep):
+    a = get_coef(xTab, yTab)
+    b = get_B(xTab, yTab, a)
+    if rep == 0:
+        print("Country:", tab[i][0])
+    else:
+        print("Country: ", end="")
+        for j in range(len(i)):
+            if j == len(i) - 1:
+                print(tab[i[j]][0])
+            else:
+                print(tab[i[j]][0] + ", ", end="")
+    print("Fit1")
+    if b < 0:
+        print("    Y = {:.2f} X - {:.2f}".format(a / 1000000, abs(b / 1000000)))
+    else:
+        print("    Y = {:.2f} X + {:.2f}".format(a / 1000000, b / 1000000))
+    print("    Root-mean-square deviation: {:.2f}".format(get_rmsd(xTab, yTab, a, b) / 1000000))
+    print("    Population in 2050: {:.2f}".format((a / 1000000) * 2050 + (b / 1000000)))
+
+def display_fit2(xTab, yTab):
+    a = coef_fit2(xTab, yTab)
+    b = B_fit2(xTab, yTab, a)
+    print("Fit2")
+    if b < 0:
+        print("    X = {:.2f} Y - {:.2f}".format((a * 1000000), abs(b)))
+    else:
+        print("    X = {:.2f} Y + {:.2f}".format((a * 1000000), b))
+    print("    Root-mean-square deviation: {:.2f}".format(get_rmsd_fit2(xTab, yTab, a, b) / 1000000))
+    print("    Population in 2050: {:.2f}".format((2050 - b) / (a * 1000000)))
+
+def display_corr(xTab, yTab):
+    a1 = get_coef(xTab, yTab)
+    a2 = coef_fit2(xTab, yTab) * 1000000
+    corr = math.sqrt(a1 * a2)
+    print("Correlation: {:.4f}".format(corr / 1000))
+
+def create_tab(tab, i):
+    tmp = []
+    for j in range(2, len(tab[i])):
+        tmp.append(tab[i][j])
+    return tmp
+
+def concat_tab(tab, idx):
+    Arr = []
+    tmp = []
+    finalTab = []
+    for i in range(len(idx)):
+        tmp = create_tab(tab, idx[i])
+        Arr.append(tmp)
+    for j in range(len(Arr[0])):
+        rep = 0
+        for k in range(len(Arr)):
+            rep += int(Arr[k][j])
+        finalTab.append(rep)
+    return finalTab
+    
+def main():
+    global xTab
+    global yTab
+    if len(sys.argv) >= 2:
+        if sys.argv[1] == "-h":
+            flag_h()
+        else:
+            tab = parse_file()
+            i = get_idx(tab, sys.argv[1])
+            xTab = create_tab(tab, 0)
+            if len(sys.argv) == 2:
+                yTab = create_tab(tab, i)
+                display_fit1(xTab, yTab, tab, i, 0)
+            else:
+                idx = []
+                for i in range(1, len(sys.argv)):
+                    idx.append(get_idx(tab, sys.argv[i]))
+                yTab = concat_tab(tab, idx)
+                display_fit1(xTab, yTab, tab, idx, 1)
+            display_fit2(xTab, yTab)
+            display_corr(xTab, yTab)
+    else:
+        exit(84)
+try:
+    main()
+except:
+    exit(84)
